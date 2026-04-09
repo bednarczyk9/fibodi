@@ -8,7 +8,7 @@ class TradingFlow:
         self.broker = MT5Broker()
         self.strategy = FibodiSMCEngine()
         
-def run_market_scan(self):
+    def run_market_scan(self):
         """Główny przepływ: Pobranie danych -> Analiza -> Egzekucja"""
         if not self.broker.connect():
             return
