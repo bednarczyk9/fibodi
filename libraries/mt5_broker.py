@@ -1,7 +1,7 @@
 import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime
-from config.config import config
+from config.config import config  # Zakładam, że tu znajduje się Twój TradingConfig
 
 class MT5Broker:
     """Klasa odpowiedzialna wyłącznie za komunikację z API MT5 (Infrastruktura)."""
@@ -10,12 +10,15 @@ class MT5Broker:
         self.symbol = symbol
 
     def connect(self) -> bool:
-        if not mt5.initialize():
-            print(f"[FATAL] Inicjalizacja MT5 nie powiodła się: {mt5.last_error()}")
+        # TUTAJ ZMIANA: Przekazujemy ścieżkę do terminala z configu
+        if not mt5.initialize(path=config.MT5_PATH):
+            print(f"[FATAL] Inicjalizacja MT5 (ścieżka: {config.MT5_PATH}) nie powiodła się: {mt5.last_error()}")
             return False
+            
         if not mt5.symbol_select(self.symbol, True):
             print(f"[FATAL] Symbol {self.symbol} niedostępny.")
             return False
+            
         print(f"[SYSTEM] Połączono z MT5. Symbol: {self.symbol}")
         return True
 
