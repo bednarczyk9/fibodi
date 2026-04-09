@@ -134,3 +134,103 @@ class FibodiSMCEngine:
             }
             
         return None
+    
+
+    def _find_bearish_order_block(self, df: pd.DataFrame, start_idx: int, end_idx: int):
+        """Szuka ostatniej świecy wzrostowej przed impulsem spadkowym (Niedźwiedzi OB)."""
+        search_area = df.iloc[max(0, start_idx - 10) : end_idx]
+        
+        # Filtrujemy tylko świece wzrostowe (Close > Open)
+        bullish_candles = search_area[search_area['close'] > search_area['open']]
+        
+        if bullish_candles.empty:
+            return None
+            
+        # Ostatnia wzrostowa świeca przed silnym zrzutem to nasz OB
+        ob_candle = bullish_candles.iloc[-1]
+        
+        return {
+            'top': ob_candle['high'],
+            'bottom': ob_candle['low'],
+            'index': ob_candle.name
+        }
+
+    def evaluate_short_setup(self, df: pd.DataFrame) -> dict | None:
+        """
+        Główna maszyna stanu dla Short (Sprzedaż).
+        Zwraca parametry egzekucji (SL, TP), jeśli konfluencja jest pełna.
+        """
+        if len(df) < 50:
+            return None
+
+        # 1. Obliczenie wskaźników i pivotów (korzystamy z już istniejących metod)
+        df = self.calculate_impulse_macd(df)
+        df = self._find_pivots(df)
+        
+        # 2. Filtr płaskiego rynku
+        recent_variance = df['imacd_hist'].tail(15).var()
+        if recent_variance < config.IMACD_FLAT_VARIANCE_THRESHOLD:
+            return None
+
+        # 3. Analiza Ostatniego Impulsu (Szukamy sekwencji: Pivot High -> Pivot Low)
+        pivot_lows = df[df['is_pivot_low']]
+        pivot_highs = df[df['is_pivot_high']]
+        
+        if pivot_lows.empty or pivot_highs.empty:
+            return None
+            
+        last_high_idx = pivot_highs.index[-1]
+        last_low_idx = pivot_lows.index[-1]
+        
+        # Upewniamy się, że dołek wystąpił PO szczycie (trend impulsywny w dół)
+        if last_low_idx <= last_high_idx:
+            return None 
+
+        P_H = df.loc[last_high_idx, 'high']
+        P_L = df.loc[last_low_idx, 'low']
+        delta = P_H - P_L
+        
+        if delta <= 0:
+            return None
+
+        # 4. Matematyka Fibo (Odwrócona dla Short)
+        # 0.786 liczone od dołu jako poziom docelowy korekty wzrostowej
+        L_0786 = P_L + (config.FIBO_LEVEL * delta)
+        TP1 = P_H - (config.TP1_LEVEL * delta)
+        TP2 = P_L # TP na ostatnim dołku
+        
+        current_price = df['close'].iloc[-1]
+        
+        # 5. Detekcja Order Blocka
+        ob = self._find_bearish_order_block(df, start_idx=last_high_idx, end_idx=last_low_idx)
+        if not ob:
+            return None
+            
+        # 6. WERYFIKACJA KONFLUENCJI (SMC + Fibo + MACD)
+        
+        ob_height = ob['top'] - ob['bottom']
+        valid_zone_top = ob['top'] + (ob_height * 0.2)
+        valid_zone_bottom = ob['bottom'] - (ob_height * 0.2)
+        
+        fibo_in_ob = valid_zone_bottom <= L_0786 <= valid_zone_top
+        price_in_zone = ob['bottom'] <= current_price <= ob['top']
+        
+        # Impulse MACD Trigger (Krzyżowanie w dół ze strefy wykupienia)
+        imacd_cross_down = (df['imacd'].iloc[-2] > df['signal'].iloc[-2]) and (df['imacd'].iloc[-1] < df['signal'].iloc[-1])
+        imacd_overbought = df['imacd'].iloc[-1] > config.IMACD_OB_LEVEL
+        
+        if fibo_in_ob and price_in_zone and imacd_cross_down and imacd_overbought:
+            # Obliczanie bezpiecznego SL nad OB (dodajemy ATR buffer)
+            atr_buffer = (df['high'].tail(14).max() - df['low'].tail(14).min()) * 0.05
+            sl_price = ob['top'] + atr_buffer
+            
+            return {
+                "action": "SELL",
+                "entry": current_price,
+                "sl": round(sl_price, 2),
+                "tp1": round(TP1, 2),
+                "tp2": round(TP2, 2),
+                "ob_level": ob['bottom']
+            }
+            
+        return None
