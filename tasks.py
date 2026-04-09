@@ -1,5 +1,5 @@
 from robocorp.tasks import task
-from keywords.trading_keywords import TradingFlow, run_market_scan
+from keywords.trading_keywords import TradingFlow
 import time
 
 @task
