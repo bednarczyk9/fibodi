@@ -6,7 +6,7 @@ class TradingConfig:
     MT5_PATH: str = r"C:\Program Files\MetaTrader 5 fibodi\terminal64.exe"
     
     # --- GŁÓWNE PARAMETRY ---
-    SYMBOL: str = "XAUUSD"
+    SYMBOL: str = "XAUUSDs"
     TIMEFRAME: int = 15  # M15
     MAGIC_NUMBER: int = 777777
     DEVIATION: int = 20
