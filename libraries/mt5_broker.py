@@ -8,18 +8,21 @@ class MT5Broker:
     
     def __init__(self, symbol: str = config.SYMBOL):
         self.symbol = symbol
+        self._connection_logged = False # Flaga logowania
 
     def connect(self) -> bool:
-        # TUTAJ ZMIANA: Przekazujemy ścieżkę do terminala z configu
-        if not mt5.initialize(path=config.MT5_PATH):
-            print(f"[FATAL] Inicjalizacja MT5 (ścieżka: {config.MT5_PATH}) nie powiodła się: {mt5.last_error()}")
+        if not mt5.initialize():
+            print(f"[FATAL] Inicjalizacja MT5 nie powiodła się: {mt5.last_error()}")
             return False
-            
         if not mt5.symbol_select(self.symbol, True):
             print(f"[FATAL] Symbol {self.symbol} niedostępny.")
             return False
             
-        print(f"[SYSTEM] Połączono z MT5. Symbol: {self.symbol}")
+        # Drukujemy log tylko przy pierwszym udanym połączeniu
+        if not self._connection_logged:
+            print(f"[SYSTEM] Połączono z MT5. Symbol: {self.symbol}. Uruchamiam radar SMC...")
+            self._connection_logged = True
+            
         return True
 
     def get_historical_data(self, timeframe: int, num_candles: int) -> pd.DataFrame:

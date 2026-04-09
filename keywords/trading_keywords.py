@@ -2,6 +2,8 @@ from libraries.mt5_broker import MT5Broker
 from libraries.strategy_engine import FibodiSMCEngine
 import MetaTrader5 as mt5
 from config.config import config
+from datetime import datetime # Dodaj ten import na samej górze pliku
+
 
 class TradingFlow:
     def __init__(self):
@@ -21,8 +23,11 @@ class TradingFlow:
         long_setup = self.strategy.evaluate_long_setup(df)
         short_setup = self.strategy.evaluate_short_setup(df)
         
+        current_price = df['close'].iloc[-1]
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
         if long_setup and long_setup['action'] == "BUY":
-            print(f"[ACTION] Wykryto setup LONG (SMC+Fibo)! SL: {long_setup['sl']}, TP1: {long_setup['tp1']}")
+            print(f"\n[!!!] {timestamp} Wykryto setup LONG (SMC+Fibo)! SL: {long_setup['sl']}, TP1: {long_setup['tp1']}")
             self.broker.execute_market_order(
                 order_type=mt5.ORDER_TYPE_BUY,
                 volume=config.VOLUME,
@@ -31,10 +36,13 @@ class TradingFlow:
             )
             
         elif short_setup and short_setup['action'] == "SELL":
-            print(f"[ACTION] Wykryto setup SHORT (SMC+Fibo)! SL: {short_setup['sl']}, TP1: {short_setup['tp1']}")
+            print(f"\n[!!!] {timestamp} Wykryto setup SHORT (SMC+Fibo)! SL: {short_setup['sl']}, TP1: {short_setup['tp1']}")
             self.broker.execute_market_order(
                 order_type=mt5.ORDER_TYPE_SELL,
                 volume=config.VOLUME,
                 sl_price=short_setup['sl'],
                 tp_price=short_setup['tp1']
             )
+        else:
+            # Bicie serca - wypisuje się w tej samej linii (nadpisuje się), żeby nie śmiecić w konsoli
+            print(f"\r[{timestamp}] Radar aktywny | Aktualna cena {self.broker.symbol}: {current_price:.2f} | Brak konfluencji Fibo+OB, czekam...", end="")
